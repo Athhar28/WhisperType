@@ -37,7 +37,7 @@ DEFAULTS = {
     "language": "en",            # "en", "hinglish", "hi", "auto", or any Whisper language code
     "hotkey2": "ctrl+shift",     # second hold-to-talk hotkey with its own language
     "language2": "hinglish",     # "hinglish", "hi", "en", "auto", or "off" to disable the second hotkey
-    "model": "base",             # "tiny" (fastest), "base", "small" (most accurate, slowest)
+    "mode": "accurate",          # "fast" = base model (quick notes), "accurate" = small model (longer text)
     "vocabulary": "",            # names / special words to help recognition, comma separated
     "sounds": True,              # beep on start / stop
     "restore_clipboard": True,   # put your previous clipboard text back after pasting
@@ -55,7 +55,10 @@ HINDI_PROMPT = "नमस्ते, यह हिंदी में लिख�
 LANGUAGES = [("English", "en"), ("Hinglish (Hindi in English letters)", "hinglish"),
              ("Hindi (हिंदी)", "hi"), ("Auto-detect", "auto")]
 LANGUAGE_NAMES = {"en": "English", "hinglish": "Hinglish", "hi": "Hindi", "auto": "Auto"}
-MODELS = [("Tiny (fastest)", "tiny"), ("Base (balanced)", "base"), ("Small (most accurate)", "small")]
+# Fast = base model (quick notes, a few seconds). Accurate = small model (longer text, more reliable words).
+MODES = [("Fast (quick notes)", "fast"), ("Accurate (longer text)", "accurate")]
+MODE_LABELS = {"fast": "Fast (quick notes)", "accurate": "Accurate (longer text)"}
+MODE_MODELS = {"fast": "base", "accurate": "small"}
 
 
 def load_config():
@@ -85,7 +88,7 @@ class Engine:
     @staticmethod
     def model_name(cfg, language=None):
         language = language or cfg["language"]
-        size = cfg["model"]
+        size = MODE_MODELS.get(cfg.get("mode", "accurate"), "small")
         # English-only models are more accurate for English at the same size.
         if language == "en" and size in ("tiny", "base", "small", "medium"):
             return size + ".en"
@@ -517,9 +520,9 @@ class App:
         def keys_label(key):
             return " + ".join(p.strip().title() for p in str(self.cfg.get(key, "")).split("+"))
 
-        def set_model(size):
+        def set_mode(mode):
             def handler(icon, item):
-                self._change("model", size)
+                self._change("mode", mode)
             return handler
 
         menu = Menu(
@@ -533,10 +536,10 @@ class App:
                 Item(label, set_language(code, "language2"), radio=True,
                      checked=lambda item, code=code: self.cfg.get("language2", "off") == code)
                 for label, code in LANGUAGES + [("Off (disable this hotkey)", "off")]])),
-            Item("Model", Menu(*[
-                Item(label, set_model(size), radio=True,
-                     checked=lambda item, size=size: self.cfg["model"] == size)
-                for label, size in MODELS])),
+            Item(lambda item: "Mode: " + MODE_LABELS.get(self.cfg.get("mode"), "Accurate"), Menu(*[
+                Item(label, set_mode(mode), radio=True,
+                     checked=lambda item, mode=mode: self.cfg.get("mode", "accurate") == mode)
+                for label, mode in MODES])),
             Item("Sounds", self._toggle_sounds, checked=lambda item: bool(self.cfg.get("sounds", True))),
             Item("Start with Windows", self._toggle_autostart, checked=lambda item: self._autostart_enabled()),
             Menu.SEPARATOR,
@@ -554,7 +557,7 @@ class App:
             return
         self.cfg[key] = value
         save_config(self.cfg)
-        if key == "model":
+        if key == "mode":
             self.engine.models.clear()   # free the old size before loading the new one
         threading.Thread(target=self._load_model, kwargs={"announce": True}, daemon=True).start()
 

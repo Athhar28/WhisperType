@@ -55,10 +55,12 @@ HINDI_PROMPT = "नमस्ते, यह हिंदी में लिख�
 LANGUAGES = [("English", "en"), ("Hinglish (Hindi in English letters)", "hinglish"),
              ("Hindi (हिंदी)", "hi"), ("Auto-detect", "auto")]
 LANGUAGE_NAMES = {"en": "English", "hinglish": "Hinglish", "hi": "Hindi", "auto": "Auto"}
-# Fast = base model (quick notes, a few seconds). Accurate = small model (longer text, more reliable words).
-MODES = [("Fast (quick notes)", "fast"), ("Accurate (longer text)", "accurate")]
-MODE_LABELS = {"fast": "Fast (quick notes)", "accurate": "Accurate (longer text)"}
-MODE_MODELS = {"fast": "base", "accurate": "small"}
+# Fast = base model (quick notes). Accurate = small model (longer text).
+# Best = large-v3-turbo (distil-large-v3 for English). Most accurate, but needs a fast GPU to be practical.
+MODES = [("Fast (quick notes)", "fast"), ("Accurate (longer text)", "accurate"), ("Best (needs GPU)", "best")]
+MODE_LABELS = {"fast": "Fast (quick notes)", "accurate": "Accurate (longer text)", "best": "Best (needs GPU)"}
+MODE_MODELS = {"fast": "base", "accurate": "small", "best": "large-v3-turbo"}
+BEST_ENGLISH_MODEL = "distil-large-v3"
 
 
 def load_config():
@@ -88,7 +90,10 @@ class Engine:
     @staticmethod
     def model_name(cfg, language=None):
         language = language or cfg["language"]
-        size = MODE_MODELS.get(cfg.get("mode", "accurate"), "small")
+        mode = cfg.get("mode", "accurate")
+        size = MODE_MODELS.get(mode, "small")
+        if mode == "best" and language == "en":
+            return BEST_ENGLISH_MODEL          # English-only distilled model: faster, nearly as accurate
         # English-only models are more accurate for English at the same size.
         if language == "en" and size in ("tiny", "base", "small", "medium"):
             return size + ".en"

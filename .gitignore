@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Personal data created at runtime - never publish these
+config.json
+last_take.wav
+*.wav
+*.log
